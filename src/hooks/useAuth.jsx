@@ -65,7 +65,18 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (name, sessionId = null) => {
         try {
-            // Sign in anonymously
+            // This is now for admin - email/password auth
+            // Regular users use loginAnonymous
+            return currentUser;
+        } catch (error) {
+            console.error('Login error:', error);
+            throw error;
+        }
+    };
+
+    const loginAnonymous = async (name, sessionId) => {
+        try {
+            // Sign in anonymously for regular users
             const result = await signInAnonymously(auth);
             const user = result.user;
 
@@ -76,9 +87,10 @@ export const AuthProvider = ({ children }) => {
             const userDocRef = doc(db, 'users', user.uid);
             const userData = {
                 name,
+                role: 'user',
+                sessionId,
                 isOnline: true,
-                lastSeen: serverTimestamp(),
-                ...(sessionId && { sessionId })
+                lastSeen: serverTimestamp()
             };
 
             await setDoc(userDocRef, userData, { merge: true });
@@ -86,7 +98,7 @@ export const AuthProvider = ({ children }) => {
 
             return user;
         } catch (error) {
-            console.error('Login error:', error);
+            console.error('Anonymous login error:', error);
             throw error;
         }
     };
@@ -95,10 +107,14 @@ export const AuthProvider = ({ children }) => {
         if (currentUser) {
             // Update user status before logging out
             const userDocRef = doc(db, 'users', currentUser.uid);
-            await updateDoc(userDocRef, {
-                isOnline: false,
-                lastSeen: serverTimestamp()
-            });
+            try {
+                await updateDoc(userDocRef, {
+                    isOnline: false,
+                    lastSeen: serverTimestamp()
+                });
+            } catch (err) {
+                console.error('Logout update error:', err);
+            }
         }
         await auth.signOut();
     };
@@ -108,6 +124,7 @@ export const AuthProvider = ({ children }) => {
         userDoc,
         loading,
         login,
+        loginAnonymous,
         logout
     };
 
